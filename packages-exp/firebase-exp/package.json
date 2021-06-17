@@ -32,6 +32,10 @@
       "node": "./app/dist/index.cjs.js",
       "default": "./app/dist/index.esm.js"
     },
+    "./app-check": {
+      "node": "./app-check/dist/index.cjs.js",
+      "default": "./app-check/dist/index.esm.js"
+    },
     "./auth": {
       "node": "./auth/dist/index.cjs.js",
       "default": "./auth/dist/index.esm.js"
