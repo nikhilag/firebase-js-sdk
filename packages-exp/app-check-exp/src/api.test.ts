@@ -10,73 +10,79 @@
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or ied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 import '../test/setup';
 import { expect } from 'chai';
 import { stub } from 'sinon';
-import { activate, setTokenAutoRefreshEnabled } from './api';
-import {
-  FAKE_SITE_KEY,
-  getFakeApp,
-  getFakeCustomTokenProvider
-} from '../test/util';
+import { setTokenAutoRefreshEnabled, initializeAppCheck } from './api';
+import { FAKE_SITE_KEY, getFullApp, getFakeApp } from '../test/util';
 import { getState } from './state';
 import * as reCAPTCHA from './recaptcha';
-import { FirebaseApp } from '@firebase/app-exp';
+import { deleteApp, FirebaseApp } from '@firebase/app-exp';
+import { ReCaptchaV3Provider } from './providers';
 
 describe('api', () => {
-  describe('activate()', () => {
-    let app: FirebaseApp;
+  let app: FirebaseApp;
 
-    beforeEach(() => {
-      app = getFakeApp();
-    });
+  beforeEach(() => {
+    app = getFullApp();
+  });
 
-    it('sets activated to true', () => {
-      expect(getState(app).activated).to.equal(false);
-      activate(app, FAKE_SITE_KEY);
-      expect(getState(app).activated).to.equal(true);
-    });
+  afterEach(() => {
+    return deleteApp(app);
+  });
 
-    it('isTokenAutoRefreshEnabled value defaults to global setting', () => {
-      app = getFakeApp({ automaticDataCollectionEnabled: false });
-      activate(app, FAKE_SITE_KEY);
-      expect(getState(app).isTokenAutoRefreshEnabled).to.equal(false);
-    });
-
-    it('sets isTokenAutoRefreshEnabled correctly, overriding global setting', () => {
-      app = getFakeApp({ automaticDataCollectionEnabled: false });
-      activate(app, FAKE_SITE_KEY, true);
-      expect(getState(app).isTokenAutoRefreshEnabled).to.equal(true);
-    });
-
+  describe('initializeAppCheck()', () => {
     it('can only be called once', () => {
-      activate(app, FAKE_SITE_KEY);
-      expect(() => activate(app, FAKE_SITE_KEY)).to.throw(
-        /AppCheck can only be activated once/
-      );
+      initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(FAKE_SITE_KEY)
+      });
+      expect(() =>
+        initializeAppCheck(app, {
+          provider: new ReCaptchaV3Provider(FAKE_SITE_KEY)
+        })
+      ).to.throw(/appCheck\/already-initialized/);
     });
 
-    it('initialize reCAPTCHA when a sitekey is provided', () => {
+    it('initialize reCAPTCHA when a ReCaptchaV3Provider is provided', () => {
       const initReCAPTCHAStub = stub(reCAPTCHA, 'initialize').returns(
         Promise.resolve({} as any)
       );
-      activate(app, FAKE_SITE_KEY);
+      initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(FAKE_SITE_KEY)
+      });
       expect(initReCAPTCHAStub).to.have.been.calledWithExactly(
         app,
         FAKE_SITE_KEY
       );
     });
 
-    it('does NOT initialize reCAPTCHA when a custom token provider is provided', () => {
-      const fakeCustomTokenProvider = getFakeCustomTokenProvider();
-      const initReCAPTCHAStub = stub(reCAPTCHA, 'initialize');
-      activate(app, fakeCustomTokenProvider);
-      expect(getState(app).customProvider).to.equal(fakeCustomTokenProvider);
-      expect(initReCAPTCHAStub).to.have.not.been.called;
+    it('sets activated to true', () => {
+      expect(getState(app).activated).to.equal(false);
+      initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(FAKE_SITE_KEY)
+      });
+      expect(getState(app).activated).to.equal(true);
+    });
+
+    it('isTokenAutoRefreshEnabled value defaults to global setting', () => {
+      app.automaticDataCollectionEnabled = false;
+      initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(FAKE_SITE_KEY)
+      });
+      expect(getState(app).isTokenAutoRefreshEnabled).to.equal(false);
+    });
+
+    it('sets isTokenAutoRefreshEnabled correctly, overriding global setting', () => {
+      app.automaticDataCollectionEnabled = false;
+      initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(FAKE_SITE_KEY),
+        isTokenAutoRefreshEnabled: true
+      });
+      expect(getState(app).isTokenAutoRefreshEnabled).to.equal(true);
     });
   });
   describe('setTokenAutoRefreshEnabled()', () => {

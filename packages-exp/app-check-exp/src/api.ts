@@ -15,14 +15,13 @@
  * limitations under the License.
  */
 
-import { AppCheck, AppCheckProvider } from './public-types';
+import { AppCheck, AppCheckOptions } from './public-types';
 import { ERROR_FACTORY, AppCheckError } from './errors';
-import { initialize as initializeRecaptcha } from './recaptcha';
 import { getState, setState, AppCheckState } from './state';
 import { FirebaseApp, getApp, _getProvider } from '@firebase/app-exp';
-import { Provider } from '@firebase/component';
 import { getModularInstance } from '@firebase/util';
 import { AppCheckService } from './factory';
+import { AppCheckProvider } from './types';
 
 declare module '@firebase/component' {
   interface NameServiceMapping {
@@ -30,53 +29,52 @@ declare module '@firebase/component' {
   }
 }
 
+export { ReCaptchaV3Provider, CustomProvider } from './providers';
+
 /**
- * Returns a Firebase AppCheck instance for the given app.
- *
+ * Activate App Check for the given app. Can be called only once per app.
+ * @param app - the FirebaseApp to activate App Check for
+ * @param options - App Check initialization options
  * @public
- *
- * @param app - The FirebaseApp to use.
  */
-export function getAppCheck(app: FirebaseApp = getApp()): AppCheck {
+export function initializeAppCheck(
+  app: FirebaseApp = getApp(),
+  options: AppCheckOptions
+): AppCheck {
   app = getModularInstance(app);
-  // Dependencies
-  const appCheckProvider: Provider<'app-check-exp'> = _getProvider(
-    app,
-    'app-check-exp'
-  );
-  const appCheckInstance = appCheckProvider.getImmediate();
-  return appCheckInstance;
+  const provider = _getProvider(app, 'app-check-exp');
+
+  if (provider.isInitialized()) {
+    throw ERROR_FACTORY.create(AppCheckError.ALREADY_INITIALIZED, {
+      appName: app.name
+    });
+  }
+
+  const appCheck = provider.initialize({ options });
+  _activate(app, options.provider, options.isTokenAutoRefreshEnabled);
+
+  return appCheck;
 }
 
 /**
- * Activate AppCheck
- * @param app - Firebase app to activate AppCheck for.
- * @param siteKeyOrProvider - reCAPTCHA v3 site key (public key) or
+ * Activate App Check
+ * @param app - Firebase app to activate App Check for.
+ * @param provider - reCAPTCHA v3 provider or
  * custom token provider.
  * @param isTokenAutoRefreshEnabled - If true, the SDK automatically
  * refreshes App Check tokens as needed. If undefined, defaults to the
  * value of `app.automaticDataCollectionEnabled`, which defaults to
  * false and can be set in the app config.
- * @public
  */
-export function activate(
+function _activate(
   app: FirebaseApp,
-  siteKeyOrProvider: string | AppCheckProvider,
+  provider: AppCheckProvider,
   isTokenAutoRefreshEnabled?: boolean
 ): void {
   const state = getState(app);
-  if (state.activated) {
-    throw ERROR_FACTORY.create(AppCheckError.ALREADY_ACTIVATED, {
-      appName: app.name
-    });
-  }
 
   const newState: AppCheckState = { ...state, activated: true };
-  if (typeof siteKeyOrProvider === 'string') {
-    newState.siteKey = siteKeyOrProvider;
-  } else {
-    newState.customProvider = siteKeyOrProvider;
-  }
+  newState.provider = provider;
 
   // Use value of global `automaticDataCollectionEnabled` (which
   // itself defaults to false if not specified in config) if
@@ -88,19 +86,15 @@ export function activate(
 
   setState(app, newState);
 
-  // initialize reCAPTCHA if siteKey is provided
-  if (newState.siteKey) {
-    initializeRecaptcha(app, newState.siteKey).catch(() => {
-      /* we don't care about the initialization result in activate() */
-    });
-  }
+  newState.provider.initialize(app);
 }
+
 /**
  * Set whether App Check will automatically refresh tokens as needed.
  *
  * @param isTokenAutoRefreshEnabled - If true, the SDK automatically
  * refreshes App Check tokens as needed. This overrides any value set
- * during `activate()`.
+ * during `initializeAppCheck()`.
  * @public
  */
 export function setTokenAutoRefreshEnabled(

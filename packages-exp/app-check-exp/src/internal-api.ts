@@ -15,27 +15,20 @@
  * limitations under the License.
  */
 
-import { getToken as getReCAPTCHAToken } from './recaptcha';
 import { FirebaseApp } from '@firebase/app-exp';
-import { AppCheckTokenResult, AppCheckTokenListener } from './types';
 import {
-  AppCheckTokenInternal,
-  getDebugState,
-  getState,
-  setState
-} from './state';
+  AppCheckTokenResult,
+  AppCheckTokenListener,
+  AppCheckTokenInternal
+} from './types';
+import { getDebugState, getState, setState } from './state';
 import { TOKEN_REFRESH_TIME } from './constants';
 import { Refresher } from './proactive-refresh';
 import { ensureActivated } from './util';
-import {
-  exchangeToken,
-  getExchangeDebugTokenRequest,
-  getExchangeRecaptchaTokenRequest
-} from './client';
+import { exchangeToken, getExchangeDebugTokenRequest } from './client';
 import { writeTokenToStorage, readTokenFromStorage } from './storage';
 import { getDebugToken, isDebugMode } from './debug';
-import { base64, issuedAtTime } from '@firebase/util';
-import { ERROR_FACTORY, AppCheckError } from './errors';
+import { base64 } from '@firebase/util';
 import { logger } from './logger';
 import { Provider } from '@firebase/component';
 
@@ -58,7 +51,7 @@ export function formatDummyToken(
 }
 
 /**
- * This function will always resolve.
+ * This function always resolves.
  * The result will contain an error field if there is any error.
  * In case there is an error, the token field in the result will be populated with a dummy value
  */
@@ -111,31 +104,10 @@ export async function getToken(
    * request a new token
    */
   try {
-    if (state.customProvider) {
-      const customToken = await state.customProvider.getToken();
-      // Try to extract IAT from custom token, in case this token is not
-      // being newly issued. JWT timestamps are in seconds since epoch.
-      const issuedAtTimeSeconds = issuedAtTime(customToken.token);
-      // Very basic validation, use current timestamp as IAT if JWT
-      // has no `iat` field or value is out of bounds.
-      const issuedAtTimeMillis =
-        issuedAtTimeSeconds !== null &&
-        issuedAtTimeSeconds < Date.now() &&
-        issuedAtTimeSeconds > 0
-          ? issuedAtTimeSeconds * 1000
-          : Date.now();
-
-      token = { ...customToken, issuedAtTimeMillis };
-    } else {
-      const attestedClaimsToken = await getReCAPTCHAToken(app).catch(_e => {
-        // reCaptcha.execute() throws null which is not very descriptive.
-        throw ERROR_FACTORY.create(AppCheckError.RECAPTCHA_ERROR);
-      });
-      token = await exchangeToken(
-        getExchangeRecaptchaTokenRequest(app, attestedClaimsToken),
-        platformLoggerProvider
-      );
-    }
+    // state.provider is populated in initializeAppCheck()
+    // ensureActivated() at the top of this function checks that
+    // initializeAppCheck() has been called.
+    token = await state.provider!.getToken();
   } catch (e) {
     // `getToken()` should never throw, but logging error text to console will aid debugging.
     logger.error(e);

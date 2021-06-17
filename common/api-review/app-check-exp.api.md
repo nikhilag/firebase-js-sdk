@@ -7,9 +7,6 @@
 import { FirebaseApp } from '@firebase/app-exp';
 
 // @public
-export function activate(app: FirebaseApp, siteKeyOrProvider: string | AppCheckProvider, isTokenAutoRefreshEnabled?: boolean): void;
-
-// @public
 export interface AppCheck {
     app: FirebaseApp;
 }
@@ -21,8 +18,9 @@ export type _AppCheckComponentName = 'app-check-exp';
 export type _AppCheckInternalComponentName = 'app-check-internal';
 
 // @public
-export interface AppCheckProvider {
-    getToken(): Promise<AppCheckToken>;
+export interface AppCheckOptions {
+    isTokenAutoRefreshEnabled?: boolean;
+    provider: CustomProvider | ReCaptchaV3Provider;
 }
 
 // @public
@@ -32,8 +30,35 @@ export interface AppCheckToken {
     readonly token: string;
 }
 
+// Warning: (ae-forgotten-export) The symbol "AppCheckProvider" needs to be exported by the entry point index.d.ts
+//
 // @public
-export function getAppCheck(app?: FirebaseApp): AppCheck;
+export class CustomProvider implements AppCheckProvider {
+    constructor(_customProviderOptions: CustomProviderOptions);
+    // Warning: (ae-forgotten-export) The symbol "AppCheckTokenInternal" needs to be exported by the entry point index.d.ts
+    //
+    // @internal (undocumented)
+    getToken(): Promise<AppCheckTokenInternal>;
+    // @internal (undocumented)
+    initialize(app: FirebaseApp): void;
+}
+
+// @public
+export interface CustomProviderOptions {
+    getToken: () => Promise<AppCheckToken>;
+}
+
+// @public
+export function initializeAppCheck(app: FirebaseApp | undefined, options: AppCheckOptions): AppCheck;
+
+// @public
+export class ReCaptchaV3Provider implements AppCheckProvider {
+    constructor(_siteKey: string);
+    // @internal
+    getToken(): Promise<AppCheckTokenInternal>;
+    // @internal (undocumented)
+    initialize(app: FirebaseApp): void;
+    }
 
 // @public
 export function setTokenAutoRefreshEnabled(app: FirebaseApp, isTokenAutoRefreshEnabled: boolean): void;
