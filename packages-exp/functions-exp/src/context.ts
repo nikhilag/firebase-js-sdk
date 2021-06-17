@@ -76,7 +76,12 @@ export class ContextProvider {
     }
 
     if (!this.appCheck) {
-      this.appCheck = appCheckProvider.getImmediate({ optional: true });
+      appCheckProvider.get().then(
+        appCheck => (this.appCheck = appCheck),
+        () => {
+          /* get() never rejects */
+        }
+      );
     }
   }
 
