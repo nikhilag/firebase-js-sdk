@@ -165,7 +165,7 @@ class BrowserPopupRedirectResolver implements PopupRedirectResolverInternal {
 
   get _shouldInitProactively(): boolean {
     // Mobile browsers and Safari need to optimistically initialize
-    return _isMobileBrowser() || _isSafari() || _isIOS();
+    return false; // _isMobileBrowser() || _isSafari() || _isIOS();
   }
 
   _completeRedirectFn = _getRedirectResult;
